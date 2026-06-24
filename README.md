@@ -163,3 +163,9 @@ Output:
 **Today:** Working on the dashboard UI
 **Blockers:** None
 ```
+
+### Deploy skill
+
+```bash
+gh skill install laksiri-fernando/skills-guide standup-writer --agent claude-code
+```
