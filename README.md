@@ -174,3 +174,206 @@ gh skill install laksiri-fernando/skills-guide standup-writer --agent claude-cod
 # opencode
 gh skill install laksiri-fernando/skills-guide standup-writer --agent opencode
 ```
+
+### New Skill with Assets, References and Scripts
+
+Meeting Notes Formatter
+
+#### Folder structure
+```text
+~/.claude/skills/meeting-notes/
+├── SKILL.md              ← main instructions
+├── scripts/
+│   └── extract_action_items.py   ← script Claude can run
+├── references/
+│   └── formatting-guide.md       ← detailed rules Claude reads when needed
+└── assets/
+    └── template.md               ← output template Claude fills in
+```
+
+#### The files
+
+`SKILL.md`
+
+```markdown
+---
+name: meeting-notes
+description: Format raw meeting notes into a structured summary. Use when
+  the user pastes meeting notes, says "format my notes", "clean up these
+  notes", or "summarize this meeting". Extracts action items, decisions,
+  and attendees automatically.
+allowed-tools: Bash(python3 *)
+---
+
+# Meeting Notes Formatter
+
+Turns raw, messy meeting notes into a clean structured summary.
+
+## Steps
+
+1. Read the raw notes the user provides
+2. Use the template in [assets/template.md](assets/template.md) as your output structure
+3. Follow the style rules in [references/formatting-guide.md](references/formatting-guide.md)
+4. Run the action item extractor script for accuracy:
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/scripts/extract_action_items.py "$ARGUMENTS"
+```
+
+5. Fill in the template with your analysis + the script's extracted action items
+6. Output the completed template as a markdown block
+
+## Notes
+- If attendees aren't listed, write "Not specified"
+- If no decisions were made, write "No decisions recorded"
+- Keep the summary under 5 bullet points
+```
+```
+
+`scripts/extract_action_items.py`
+
+```py
+#!/usr/bin/env python3
+"""
+Scans raw meeting notes and extracts action items as "WHO will WHAT".
+
+Splits the text into sentences (notes are often one long line), then for each
+sentence pulls out the actor and the action. Handles:
+  - "@alice to update the docs"        -> "Alice will update the docs"
+  - "John will send the report by Fri" -> "John will send the report by Fri"
+  - "Bob to schedule a call"           -> "Bob will schedule a call"
+
+Decision statements ("Decided to ...", "Agreed to ...") are NOT action items
+and are skipped.
+"""
+
+import sys
+import re
+
+# Verbs that introduce a decision, not an assignment. Used as the leading word
+# these would otherwise look like "<who> to <action>", so we exclude them.
+DECISION_WORDS = {
+    "decided", "agreed", "approved", "rejected", "deferred", "discussed",
+    "resolved", "concluded",
+}
+
+# Sentence-level patterns. Each captures (who, action).
+PATTERNS = [
+    # "ACTION: John will send report"
+    (re.compile(r"ACTION[:\s]+(?P<who>\w+)\s+(?:will|to|should)\s+(?P<action>.+)", re.IGNORECASE), None),
+    # "@alice will/to/should update the docs"
+    (re.compile(r"@(?P<who>\w+)\s+(?:will|to|should)\s+(?P<action>.+)", re.IGNORECASE), None),
+    # "John will/to/should send the report by Friday"
+    (re.compile(r"\b(?P<who>\w+)\s+(?:will|to|should)\s+(?P<action>.+)", re.IGNORECASE), None),
+]
+
+
+def split_sentences(text: str) -> list[str]:
+    # Split on sentence terminators and newlines; keep non-empty fragments.
+    parts = re.split(r"[.\n!?]+", text)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def extract_action_items(text: str) -> list[str]:
+    items = []
+    seen = set()
+    for sentence in split_sentences(text):
+        for pattern, _ in PATTERNS:
+            match = pattern.search(sentence)
+            if not match:
+                continue
+            who = match.group("who")
+            if who.lower() in DECISION_WORDS:
+                break  # a decision, not an action item
+            action = match.group("action").strip().rstrip(".")
+            who = who.capitalize()
+            item = f"{who} will {action}"
+            if item.lower() not in seen:
+                seen.add(item.lower())
+                items.append(f"- {item}")
+            break  # first matching pattern wins for this sentence
+
+    return items if items else ["- No action items detected"]
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        raw_text = " ".join(sys.argv[1:])
+    else:
+        raw_text = sys.stdin.read()
+
+    print("## Extracted Action Items\n")
+    for item in extract_action_items(raw_text):
+        print(item)
+```
+
+`references/formatting-guide.md`
+
+```markdown
+# Meeting Notes Formatting Guide
+
+Load this file when you need to apply consistent formatting rules.
+
+## Tone
+- Use past tense for what was discussed ("The team decided...")
+- Use future tense for action items ("Alice will send...")
+- Be concise — one idea per bullet
+
+## Dates & Times
+- Always write dates as: 24 Jun 2026
+- Use 24-hour format for times: 14:30, not 2:30 PM
+
+## People
+- Use first names only unless two people share a first name
+- If a role is mentioned, add it in brackets: Alice [PM]
+
+## Action Items
+- Must include: WHO + WILL DO WHAT + BY WHEN (if stated)
+- Example: "Alice will share the Q3 report by Friday"
+- If no deadline is given, write: "Alice will share the Q3 report (no deadline set)"
+
+## Decisions
+- Start each decision with a strong verb: "Approved", "Rejected", "Agreed", "Deferred"
+- Example: "Approved the new onboarding flow design"
+```
+
+`assets/template.md`
+
+```markdown
+# Meeting Summary
+
+**Date:** {{DATE}}
+**Attendees:** {{ATTENDEES}}
+
+---
+
+## Summary
+{{SUMMARY_BULLETS}}
+
+## Decisions Made
+{{DECISIONS}}
+
+## Action Items
+{{ACTION_ITEMS}}
+
+## Next Meeting
+{{NEXT_MEETING}}
+```
+
+#### Try it
+Once installed at `~/.claude/skills/meeting-notes/`, paste some raw notes and say:
+
+```text
+Format my meeting notes: "Discussed Q3 launch. John will send the report 
+by Friday. @alice to update the docs. Decided to delay the beta by 2 weeks."
+```
+
+### Deploy
+
+```bash
+# claude code
+gh skill install laksiri-fernando/skills-guide meeting-notes --agent claude-code
+
+# opencode
+gh skill install laksiri-fernando/skills-guide meeting-notes --agent opencode
+```
