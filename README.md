@@ -167,5 +167,10 @@ Output:
 ### Deploy skill
 
 ```bash
+
+# claude code
 gh skill install laksiri-fernando/skills-guide standup-writer --agent claude-code
+
+# opencode
+gh skill install laksiri-fernando/skills-guide standup-writer --agent opencode
 ```
