@@ -216,9 +216,7 @@ Turns raw, messy meeting notes into a clean structured summary.
 3. Follow the style rules in [references/formatting-guide.md](references/formatting-guide.md)
 4. Run the action item extractor script for accuracy:
 
-```bash
-python3 ${CLAUDE_SKILL_DIR}/scripts/extract_action_items.py "$ARGUMENTS"
-```
+`python3 ${CLAUDE_SKILL_DIR}/scripts/extract_action_items.py "$ARGUMENTS"`
 
 5. Fill in the template with your analysis + the script's extracted action items
 6. Output the completed template as a markdown block
@@ -227,7 +225,6 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/extract_action_items.py "$ARGUMENTS"
 - If attendees aren't listed, write "Not specified"
 - If no decisions were made, write "No decisions recorded"
 - Keep the summary under 5 bullet points
-```
 ```
 
 `scripts/extract_action_items.py`
